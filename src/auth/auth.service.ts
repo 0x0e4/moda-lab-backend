@@ -10,13 +10,13 @@ import * as bcrypt from 'bcrypt';
 export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
-    private readonly usersService: UserService, // Внедрение UsersService
+    private readonly usersService: UserService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<User> {
     const existingUser  = await this.usersService.findByEmail(registerDto.email);
     if (existingUser ) {
-      throw new Error('User  already exists');
+      throw new Error('Пользователь уже зарегистрирован');
     }
 
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
@@ -41,6 +41,6 @@ export class AuthService {
     if (user && (await bcrypt.compare(password, user.password))) {
       return user;
     }
-    throw new Error('Invalid credentials');
+    throw new Error('Неверный логин или пароль');
   }
 }

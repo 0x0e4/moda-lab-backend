@@ -10,17 +10,20 @@ import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { Category } from './entities/category.entity';
 import { OrdersModule } from './orders/orders.module';
+import { UserAddress } from './entities/address.entity';
+import { CategoryAttrib } from './entities/catattrib.entity';
+import { ProductAttrib } from './entities/prodattrib.entity';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'mysql',
-      host: 'localhost',
+      host: '',
       port: 3306,
       database: '',
       password: '',
       username: '',
-      entities: [Product, Order, DeliveryPoint, User, Category],
+      entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, CategoryAttrib, ProductAttrib],
       synchronize: true,
     }),
     UserModule,

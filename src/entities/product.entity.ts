@@ -1,7 +1,8 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, ManyToOne, JoinTable } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, ManyToOne, JoinTable, OneToMany } from 'typeorm';
 import { Order } from './order.entity';
 import { User } from './user.entity';
 import { Category } from './category.entity';
+import { ProductAttrib } from './prodattrib.entity';
 
 @Entity()
 export class Product {
@@ -17,17 +18,17 @@ export class Product {
   @Column()
   description: string;
 
-  @Column()
-  imageUrl: string;
+  @Column('json', { nullable: true })
+  imageUrls: string[];
 
   @ManyToMany(() => Order, (order) => order.products)
   orders: Order[];
 
-  @ManyToMany(() => User, user => user.wishlist) // Связь с пользователем
-  users: User[]; // Список желаемого
+  @OneToMany(() => ProductAttrib, (attr) => attr.prod)
+  attributes: ProductAttrib[];
 
-  @Column('json', { nullable: true }) // Динамичные атрибуты
-  attributes: Record<string, any>;
+  @ManyToMany(() => User, user => user.wishlist)
+  users: User[];
 
   @Column('integer', { default: 0 })
   count: number;

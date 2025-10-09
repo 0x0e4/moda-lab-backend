@@ -3,6 +3,7 @@ import { Product } from './product.entity';
 import { DeliveryPoint } from './delpoint.entity';
 import { User } from './user.entity';
 import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
+import { UserAddress } from './address.entity';
 
 export enum OrderStatus {
   PROCESSING = 'processing', // Обработка
@@ -17,13 +18,11 @@ export class Order {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
-  @IsString()
-  @IsNotEmpty()
-  customerName: string;
-
   @ManyToOne(() => DeliveryPoint, (deliveryPoint) => deliveryPoint.orders)
-  deliveryPoint: DeliveryPoint;
+  deliveryPoint?: DeliveryPoint;
+
+  @ManyToOne(() => UserAddress, (addr) => addr.orders)
+  userAddress?: UserAddress;
 
   @ManyToMany(() => Product, (product) => product.orders)
   @JoinTable()
@@ -45,6 +44,6 @@ export class Order {
 
   // Метод для проверки, может ли заказ иметь статус "Доставлено в пункт выдачи"
   canBeDeliveredToPickup(): boolean {
-    return !this.deliveryPoint.isDoorDelivery;
+    return this.deliveryPoint !== undefined;
   }
 }

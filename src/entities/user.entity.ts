@@ -1,5 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { Order } from './order.entity'; // Импортируем сущность Order
+import { UserAddress } from './address.entity'; // Импортируем сущность Order
 import { Product } from './product.entity'; // Импортируем сущность Product
 
 export enum UserRole {
@@ -33,13 +34,7 @@ export class User {
   phoneNumber: string;
 
   @Column({ nullable: true })
-  address: string; // Адрес пользователя
-
-  @Column({ nullable: true })
   city: string; // Город пользователя
-
-  @Column({ nullable: true })
-  postalCode: string; // Почтовый индекс
 
   @Column({ nullable: true })
   country: string; // Страна пользователя
@@ -52,6 +47,9 @@ export class User {
 
   @OneToMany(() => Order, order => order.user) // Связь с сущностью Order
   orders: Order[]; // Список заказов пользователя
+
+  @OneToMany(() => UserAddress, addr => addr.user)
+  addresses: UserAddress[];
 
   @ManyToMany(() => Product, product => product.users)
   @JoinTable()

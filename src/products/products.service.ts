@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
 import { Category } from '../entities/category.entity';
+import { ProductAttrib } from 'src/entities/prodattrib.entity';
 
 interface Dictionary<T> {
   [key: string]: T
@@ -15,11 +16,13 @@ export class ProductsService {
     private productsRepository: Repository<Product>,
     @InjectRepository(Category)
     private categoriesRepository: Repository<Category>,
+    @InjectRepository(ProductAttrib)
+    private prodAttribRepository: Repository<ProductAttrib>,
   ) {}
 
   async createProduct(name: string, price: number, desc: string, imageUrl: string, attributes: Record<string, any>, categoryId: number): Promise<Product> {
     const category = await this.categoriesRepository.findOneBy({ id: categoryId });
-    const product = this.productsRepository.create({ name: name, price: price, description: desc, imageUrl: imageUrl, attributes: attributes, category: category ? category : undefined });
+    const product = this.productsRepository.create({ name: name, price: price, description: desc, imageUrls: [], category: category ? category : undefined });
     return this.productsRepository.save(product);
   }
 
@@ -31,28 +34,10 @@ export class ProductsService {
     return product;
   }
 
-  async getCategoryFilters(categoryId: number): Promise<Dictionary<string[]>> {
-    const category = await this.categoriesRepository.findOneBy({ id: categoryId });
-    if(category == null) return {};
-
-    const products = await this.productsRepository.findBy({ category: category });
-    let result: Dictionary<string[]> = {};
-    products.forEach(element => {
-      const entries = Object.entries(element.attributes);
-      entries.forEach(value => {
-        let oldValue = result[value[0]] || [];
-        if(oldValue.indexOf(value[1]) == -1) oldValue.push(value[1]);
-        result[value[0]] = oldValue;
-      });
-    });
-  
-    return result;
-  }
-
   async getRandomProducts(limit: number, offset: number, seed: number): Promise<{ products: Product[], hasMore: boolean }> {
     const total = await this.productsRepository.count();
     const products = await this.productsRepository.createQueryBuilder('product')
-      .orderBy(`RAND(${seed})`) // Используем seed для генерации рандомных товаров
+      .orderBy(`RAND(${seed})`)
       .skip(offset)
       .take(limit)
       .getMany();
@@ -61,6 +46,10 @@ export class ProductsService {
       products,
       hasMore: (offset + products.length) < total,
     };
+  }
+
+  async isProductsExistByAttrib(category: Category, attribName: string): Promise<boolean> {
+    return await this.prodAttribRepository.count({ where: { category: category, attribName: attribName } }) > 0;
   }
 
   async getProductsByCategory(

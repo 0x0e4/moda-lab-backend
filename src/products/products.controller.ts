@@ -6,14 +6,9 @@ import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/entities/user.entity';
 
-interface Dictionary<T> {
-  [key: string]: T
-}
-
-
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -34,18 +29,13 @@ export class ProductsController {
   }
 
   @Get('random')
-async getRandomProducts(
-  @Query('limit') limit: number = 30,
-  @Query('offset') offset: number = 0,
-  @Query('seed') seed: number
-): Promise<{ products: Product[], hasMore: boolean }> {
-  return this.productsService.getRandomProducts(limit, offset, seed);
-}
-
-@Get('filters/:categoryId')
-async getCategoryFilters(@Param('categoryId') categoryId: number): Promise<Dictionary<string[]>> {
-  return this.productsService.getCategoryFilters(categoryId);
-}
+  async getRandomProducts(
+    @Query('limit') limit: number = 30,
+    @Query('offset') offset: number = 0,
+    @Query('seed') seed: number
+  ): Promise<{ products: Product[], hasMore: boolean }> {
+    return this.productsService.getRandomProducts(limit, offset, seed);
+  }
 
   @Get('category/:categoryId')
   async getProductsByCategory(
@@ -55,7 +45,7 @@ async getCategoryFilters(@Param('categoryId') categoryId: number): Promise<Dicti
     @Query('sortBy') sortBy: string = 'name',
     @Query('filter') filter: string = ''
   ): Promise<Product[]> {
-    if(limit > 50) limit = 50;
+    if (limit > 50) limit = 50;
     return this.productsService.getProductsByCategory(categoryId, page, limit, sortBy, filter);
   }
 }

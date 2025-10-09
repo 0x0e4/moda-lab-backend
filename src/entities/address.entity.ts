@@ -1,11 +1,15 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, Unique, PrimaryColumn } from 'typeorm';
 import { Order } from './order.entity';
 import { IsString, IsNotEmpty, IsPhoneNumber } from 'class-validator';
+import { User } from './user.entity';
 
 @Entity()
-export class DeliveryPoint {
+export class UserAddress {
   @PrimaryGeneratedColumn()
   id: number;
+
+  @ManyToOne(() => User, (user) => user.addresses)
+  user: User;
 
   @Column()
   @IsString()
@@ -16,6 +20,6 @@ export class DeliveryPoint {
   @IsPhoneNumber('RU')
   contactNumber: string;
 
-  @OneToMany(() => Order, (order) => order.deliveryPoint)
+  @OneToMany(() => Order, (order) => order.userAddress)
   orders: Order[];
 }
