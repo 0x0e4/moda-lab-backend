@@ -13,6 +13,7 @@ import { OrdersModule } from './orders/orders.module';
 import { UserAddress } from './entities/address.entity';
 import { CategoryAttrib } from './entities/catattrib.entity';
 import { ProductAttrib } from './entities/prodattrib.entity';
+import { ProductAttribSubscriber } from './products/prodattrib.subscriber';
 
 @Module({
   imports: [
@@ -25,12 +26,15 @@ import { ProductAttrib } from './entities/prodattrib.entity';
       username: '',
       entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, CategoryAttrib, ProductAttrib],
       synchronize: true,
+      autoLoadEntities: true,
+      subscribers: [ProductAttribSubscriber]
     }),
     UserModule,
     AuthModule,
     CategoriesModule,
     ProductsModule,
-    OrdersModule
+    OrdersModule,
+    ProductsModule
   ],
 })
 export class AppModule {}

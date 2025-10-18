@@ -24,30 +24,4 @@ export class ProductAttrib {
 
   @Column()
   attribValue: string;
-
-  @InjectRepository(CategoryAttrib)
-  private catattribRepository: Repository<CategoryAttrib>;
-  @InjectRepository(ProductAttrib)
-  private prodAttribRepository: Repository<ProductAttrib>;
-
-  @BeforeInsert()
-  async addCategoryAttrib() {
-    this.category = this.prod.category;
-
-    if((await this.catattribRepository.findBy({ category: this.category, attribName: this.attribName })).length == 0)
-    {
-      const catAttrib = this.catattribRepository.create({ category: this.category, attribName: this.attribName });
-      return this.catattribRepository.save(catAttrib);
-    }
-  }
-
-  @AfterRemove()
-  async deleteCategoryAttrib() {
-    if(await this.prodAttribRepository.count({ where: { category: this.category, attribName: this.attribName } }) == 0)
-    {
-      const catAttrib = await this.catattribRepository.findOneBy({ category: this.category, attribName: this.attribName });
-      if(catAttrib !== null)
-        this.catattribRepository.remove(catAttrib);
-    }
-  }
 }

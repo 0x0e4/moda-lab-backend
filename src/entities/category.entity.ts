@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, Tree, TreeParent, TreeChildren } from 'typeorm';
 import { Product } from './product.entity';
 import { CategoryAttrib } from './catattrib.entity';
 import { ProductAttrib } from './prodattrib.entity';
