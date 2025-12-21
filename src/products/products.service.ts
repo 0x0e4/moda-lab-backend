@@ -177,7 +177,6 @@ export class ProductsService {
   filter: { attributeId: number; valueId: number }[] = [],
 ): Promise<any[]> {
 
-  // 🔐 whitelist сортировки
   const allowedSort = ['name', 'price', 'createdAt'];
   if (!allowedSort.includes(sortBy)) {
     sortBy = 'name';
@@ -201,43 +200,17 @@ export class ProductsService {
     SELECT id FROM category_tree
   `;
 
-  /**
-   * ============================
-   * 2. Attributes JSON
-   * ============================
-   */
-  const attributesSubQuery = `
+  const imagesSubQuery = `
     SELECT JSON_ARRAYAGG(
-      JSON_OBJECT(
-        'attributeName', att.name,
-        'attributeValue', av.value
-      )
+      pi.url
     )
-    FROM product_attribute_value pav_tmp
-    JOIN attribute_value av ON av.id = pav_tmp.valueId
-    JOIN attribute att ON att.id = av.attributeId
-    WHERE pav_tmp.variantId = v.id
+    FROM product_image pi
+    WHERE pi.variantId = v.id
   `;
 
   /**
    * ============================
-   * 3. Sizes JSON
-   * ============================
-   */
-  const sizesSubQuery = `
-    SELECT JSON_ARRAYAGG(
-      JSON_OBJECT(
-        'size', ps.size,
-        'stock', ps.stock
-      )
-    )
-    FROM product_size ps
-    WHERE ps.productVariantId = v.id
-  `;
-
-  /**
-   * ============================
-   * 4. Основной QueryBuilder
+   * 2. Основной QueryBuilder
    * ============================
    */
   const qb = this.productsRepository
@@ -248,20 +221,15 @@ export class ProductsService {
     .select([
       'p.id AS product_id',
       'p.name AS product_name',
-      'p.description AS product_description',
       'p.categoryId AS product_categoryId',
 
       'v.id AS variant_id',
       'v.sku AS variant_sku',
       'v.price AS variant_price',
-
-      `GROUP_CONCAT(DISTINCT pi.url SEPARATOR ' ') AS variant_images`,
     ])
 
-    .addSelect(`(${attributesSubQuery})`, 'attributes')
-    .addSelect(`(${sizesSubQuery})`, 'sizes')
+    .addSelect(`(${imagesSubQuery})`, 'variant_images')
 
-    // 🔹 рекурсивные категории
     .where(`p.categoryId IN (${categorySubQuery})`)
     .setParameter('categoryId', categoryId)
 
@@ -272,7 +240,7 @@ export class ProductsService {
 
   /**
    * ============================
-   * 5. Фильтры по атрибутам
+   * 3. Фильтры по атрибутам
    * ============================
    */
   if (filter.length > 0) {
@@ -299,11 +267,6 @@ export class ProductsService {
     }
   }
 
-  /**
-   * ============================
-   * 6. Выполнение
-   * ============================
-   */
   return qb.getRawMany();
 }
 }
