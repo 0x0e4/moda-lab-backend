@@ -1,7 +1,12 @@
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToOne, Tree, TreeParent, TreeChildren } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 import { Product } from './product.entity';
-import { CategoryAttrib } from './catattrib.entity';
-import { ProductAttrib } from './prodattrib.entity';
+import { CategoryAttribute } from './categoryAttribute.entity';
+
+export enum Gender {
+  UNISEX = 'unisex',
+  MALE = 'male',
+  FEMALE = 'female'
+}
 
 @Entity()
 export class Category {
@@ -11,18 +16,18 @@ export class Category {
   @Column()
   name: string;
 
-  @ManyToOne(() => Category, (category) => category.subcategories, { nullable: true })
+  @ManyToOne(() => Category, category => category.subcategories, { nullable: true, onDelete: 'SET NULL' })
   parentCategory: Category;
 
-  @OneToMany(() => Category, (category) => category.parentCategory)
+  @OneToMany(() => Category, category => category.parentCategory)
   subcategories: Category[];
 
-  @OneToMany(() => Product, (product) => product.category)
+  @Column({ type: 'enum', enum: Gender, default: Gender.UNISEX })
+  gender: Gender;
+
+  @OneToMany(() => Product, product => product.category)
   products: Product[];
 
-  @OneToMany(() => CategoryAttrib, attr => attr.category)
-  attributes: CategoryAttrib[];
-
-  @OneToMany(() => ProductAttrib, attr => attr.category)
-  prodAttr: ProductAttrib[];
+  @OneToMany(() => CategoryAttribute, ca => ca.category)
+  categoryAttributes: CategoryAttribute[];
 }

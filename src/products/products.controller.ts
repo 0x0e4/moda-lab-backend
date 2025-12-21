@@ -1,67 +1,38 @@
-import { Controller, Post, Body, Get, UseGuards, Query, Param, Put, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Query, Param, Put, Delete, BadRequestException, UseInterceptors, ParseArrayPipe, ValidationPipe } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { Product } from '../entities/product.entity';
 import { RolesGuard } from 'src/auth/roles.guard';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/entities/user.entity';
-import { ProductAttrib } from 'src/entities/prodattrib.entity';
+import { CreateProductDto, ParseJsonPipe } from 'src/dto/product.dto';
+import { Gender } from 'src/entities/category.entity';
+import { Attribute } from 'src/entities/attribute.entity';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 
-export interface Attrib {
-  attribName: string;
-  attribValue: string;
-}
-
+@UseInterceptors(CacheInterceptor)
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) { }
+  constructor(private readonly productsService: ProductsService) {}
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.EMPLOYEE)
-  async createProduct(
-    @Body() createProductDto: { name: string; price: number; desc: string; imageUrl: string; attributes: Record<string, any>; categoryId: number }
-  ): Promise<Product> {
-    return this.productsService.createProduct(createProductDto.name, createProductDto.price, createProductDto.desc, createProductDto.imageUrl, createProductDto.attributes, createProductDto.categoryId);
+  async createProduct(@Body() createProductDto: CreateProductDto): Promise<Product> {
+    // предполагаем, что createProductDto.attributes теперь содержит {attributeId, valueId}[]
+    return this.productsService.createProduct(
+      createProductDto
+    );
   }
 
-  @Put()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.EMPLOYEE)
-  async addProduct(
-    @Body() addProductDto: { productId: number; count: number; }
-  ): Promise<Product> {
-    return this.productsService.addProduct(addProductDto.productId, addProductDto.count);
+  @Get('attributes')
+  async getAttributes(): Promise<Attribute[]> {
+    return this.productsService.getAttributes();
   }
 
-  @Get(':prodId')
-  async getProductInfo(
-    @Param('prodId') prodId: number
-  ): Promise<{ product: Product | null, attribs: Attrib[] }> {
-    return this.productsService.getProductInfo(prodId);
-  }
-
-  @Put('attributes')
-  async addProductAttrib(
-    @Body() addProductAttribDto: { productId: number; attribName: string; attribValue: string; }
-  ): Promise<ProductAttrib> {
-    return this.productsService.addProductAttrib(addProductAttribDto.productId, addProductAttribDto.attribName, addProductAttribDto.attribValue);
-  }
-
-  @Delete('attributes/:prodId/:attribName')
-  async removeProductAttrib(
-    @Param('prodId') productId: number, @Param('attribName') attribName: string
-  ): Promise<ProductAttrib> {
-    return this.productsService.removeProductAttrib(productId, attribName);
-  }
-
-  @Get('random')
-  async getRandomProducts(
-    @Query('limit') limit: number = 30,
-    @Query('page') page: number = 1,
-    @Query('seed') seed: number
-  ): Promise<{ products: Product[], hasMore: boolean }> {
-    return this.productsService.getRandomProducts(limit, page, seed);
+  @Get(':variantId')
+  async getProductInfo(@Param('variantId') variantId: number): Promise<Product | null> {
+    return this.productsService.getProductInfo(variantId);
   }
 
   @Get('category/:categoryId')
@@ -69,12 +40,12 @@ export class ProductsController {
     @Param('categoryId') categoryId: number,
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 30,
-    @Query('sortBy') sortBy: string = 'name',
-    @Query('filter') filter: string = ''
+    @Query('sortBy') sortBy: string = 'id',
+    @Query('filter', ParseJsonPipe) filter: { attributeId: number; valueId: number }[] = [],
   ): Promise<Product[]> {
-    if (limit > 50) limit = 50;
-    const attribs: Attrib[] = filter.length > 2 ? JSON.parse(filter) : [];
+    if (limit > 50 || limit < 5) throw new BadRequestException('Limit must be in 5 to 50.');
+    if (page < 1) throw new BadRequestException('Page must be greater than 0.');
 
-    return this.productsService.getProductsByCategory(categoryId, page, limit, sortBy, attribs);
+    return this.productsService.getProductsByCategory(categoryId, page, limit, sortBy, filter);
   }
 }

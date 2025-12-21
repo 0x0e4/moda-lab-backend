@@ -1,11 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Product } from '../entities/product.entity';
-import { Category } from '../entities/category.entity';
-import { ProductAttrib } from 'src/entities/prodattrib.entity';
-import { CategoryAttrib } from 'src/entities/catattrib.entity';
-import { Attrib } from './products.controller';
+import { Category, Gender } from '../entities/category.entity';
+import { ProductVariant } from 'src/entities/productVariant.entity';
+import { AttributeValue } from 'src/entities/attributeValue.entity';
+import { ProductAttributeValue } from 'src/entities/productAttributeValue.entity';
+import { ProductImage } from 'src/entities/productImage.entity';
+import { CreateProductDto } from 'src/dto/product.dto';
+import { Attribute } from 'src/entities/attribute.entity';
+import { ProductSize } from 'src/entities/productSize.entity';
 
 interface Dictionary<T> {
   [key: string]: T
@@ -18,50 +22,125 @@ export class ProductsService {
     private productsRepository: Repository<Product>,
     @InjectRepository(Category)
     private categoriesRepository: Repository<Category>,
-    @InjectRepository(ProductAttrib)
-    public prodAttribRepository: Repository<ProductAttrib>,
-    @InjectRepository(ProductAttrib)
-    public catAttribRepository: Repository<CategoryAttrib>,
-  ) {}
+    @InjectRepository(ProductVariant)
+    public productVariantsRepository: Repository<ProductVariant>,
+    @InjectRepository(AttributeValue)
+    public attributeValuesRepository: Repository<AttributeValue>,
+    @InjectRepository(ProductAttributeValue)
+    public productAttributeValuesRepository: Repository<ProductAttributeValue>,
+    @InjectRepository(ProductImage)
+    public productImagesRepository: Repository<ProductImage>,
+    @InjectRepository(Attribute)
+    public attributeRepository: Repository<Attribute>,
+    @InjectRepository(ProductSize)
+    public productSizeRepository: Repository<ProductSize>,
+  ) { }
 
-  async createProduct(name: string, price: number, desc: string, imageUrl: string, attributes: Record<string, any>, categoryId: number): Promise<Product> {
-    const category = await this.categoriesRepository.findOneBy({ id: categoryId });
-    const product = this.productsRepository.create({ name: name, price: price, description: desc, imageUrls: [], category: category ? category : undefined });
-    return this.productsRepository.save(product);
-  }
+  async createProduct(dto: CreateProductDto): Promise<Product> {
+    const category = await this.categoriesRepository.findOneBy({ id: dto.categoryId });
+    if (!category) throw new NotFoundException(`Category with id ${dto.categoryId} not found`);
 
-  async addProduct(productId: number, count: number): Promise<Product> {
-    const product = await this.productsRepository.findOneBy({ id: productId });
-    if(product == null) throw new NotFoundException(`Product with ID ${productId} not found`);
-    product.count += count > 0 ? count : 0;
-    await this.productsRepository.update({ id: productId }, product);
+    const product = this.productsRepository.create({
+      name: dto.name,
+      category: category,
+    });
+    await this.productsRepository.save(product);
+
+    // Создаём все варианты
+    for (const variantDto of dto.variants) {
+      const variant = this.productVariantsRepository.create({
+        product: product,
+        price: variantDto.price,
+        sku: variantDto.sku,
+        sizes: variantDto.sizes
+      });
+      await this.productVariantsRepository.save(variant);
+
+      // Привязываем атрибуты к варианту
+      for (const attr of variantDto.attributes) {
+        const value = await this.attributeValuesRepository.findOneBy({ id: attr.valueId });
+        if (!value) throw new NotFoundException(`Attribute value with id ${attr.valueId} not found`);
+
+        const pav = this.productAttributeValuesRepository.create({
+          variant,
+          value,
+        });
+        await this.productAttributeValuesRepository.save(pav);
+      }
+
+      // Привязываем картинки к варианту, если есть
+      if (variantDto.imageUrls?.length) {
+        for (let i = 0; i < variantDto.imageUrls.length; i++) {
+          const img = this.productImagesRepository.create({
+            variant,
+            url: variantDto.imageUrls[i],
+            sortOrder: i,
+          });
+          await this.productImagesRepository.save(img);
+        }
+      }
+    }
+
     return product;
   }
 
-  async addProductAttrib(productId: number, attribName: string, attribValue: string): Promise<ProductAttrib> {
-    const product = await this.productsRepository.findOneBy({ id: productId });
-    if(product == null) throw new NotFoundException(`Product with ID ${productId} not found`);
-    const attrib = this.prodAttribRepository.create({ prod: product, attribName: attribName, attribValue: attribValue });
-    return this.prodAttribRepository.save(attrib);
+  async getAttributes(): Promise<Attribute[]> {
+    const attributes = await this.attributeRepository.find({ relations: { values: true } });
+
+    return attributes;
   }
 
-  async removeProductAttrib(productId: number, attribName: string): Promise<ProductAttrib> {
-    const productAttrib = await this.prodAttribRepository.findOneBy({ prodId: productId, attribName: attribName });
-    if(productAttrib == null) throw new NotFoundException(`Product attribute not found`);
-    return this.prodAttribRepository.remove(productAttrib);
+  // Получение информации о продукте с вариантами и атрибутами
+  async getProductInfo(variantId: number): Promise<Product | null> {
+    const variant = await this.productVariantsRepository.findOne({
+      where: { id: variantId },
+      relations: { product: true },
+    });
+
+    if (!variant) return null;
+
+    // Затем загружаем продукт с **всеми вариантами** и их связями
+    const product = await this.productsRepository.findOne({
+      where: { id: variant.product.id },
+      relations: {
+        category: true,
+        variants: {
+          attributeValues: { value: { attribute: true } },
+          images: true,
+          sizes: true
+        },
+      },
+    });
+    return product;
   }
 
-  async getProductInfo(prodId: number): Promise<{ product: Product | null, attribs: Attrib[] }> {
-    const product = await this.productsRepository.findOneBy({ id: prodId });
-    const attribs = await this.prodAttribRepository.find({ where: { prodId: prodId }, select: [ "attribName", "attribValue" ]});
-  
-    return {
-      product,
-      attribs,
-    };
+  // Добавление товара на склад для конкретного варианта
+  async addProductVariantCount(variantId: number, size: string, count: number): Promise<ProductVariant> {
+    const variant = await this.productVariantsRepository.findOneBy({ id: variantId });
+    if (!variant) throw new NotFoundException(`Variant with ID ${variantId} not found`);
+
+    const sizes = variant.sizes;
+    const sizeIndex = sizes.findIndex((value) => value.size == size);
+    if(sizeIndex == -1)
+    {
+      const productSize = this.productSizeRepository.create({ productVariant: variant, size: size, stock: count });
+      await this.productSizeRepository.save(productSize);
+    } else {
+      const productSize = sizes[sizeIndex];
+      productSize.stock += count;
+      await this.productSizeRepository.save(productSize);
+    }
+    return variant;
   }
 
-  async getRandomProducts(limit: number, page: number, seed: number): Promise<{ products: Product[], hasMore: boolean }> {
+  // Удаление атрибута из варианта
+  async removeProductVariantAttribute(pavId: number): Promise<void> {
+    const pav = await this.productAttributeValuesRepository.findOneBy({ id: pavId });
+    if (!pav) throw new NotFoundException(`Product attribute value not found`);
+    await this.productAttributeValuesRepository.remove(pav);
+  }
+
+  /*async getRandomProducts(limit: number, page: number, seed: number): Promise<{ products: Product[], hasMore: boolean }> {
     const total = await this.productsRepository.count();
     const products = await this.productsRepository.createQueryBuilder('product')
       .orderBy(`RAND(${seed})`)
@@ -73,32 +152,158 @@ export class ProductsService {
       products,
       hasMore: page * limit < total,
     };
+  }*/
+
+  // Проверяем, есть ли продукты в категории с указанным атрибутом
+  async isProductsExistByAttrib(category: Category, attributeId: number): Promise<boolean> {
+    const count = await this.productVariantsRepository
+      .createQueryBuilder('variant')
+      .innerJoin('variant.product', 'product')
+      .innerJoin('variant.attributeValues', 'pav')
+      .innerJoin('pav.value', 'av')
+      .where('product.categoryId = :categoryId', { categoryId: category.id })
+      .andWhere('av.attributeId = :attributeId', { attributeId })
+      .getCount();
+
+    return count > 0;
   }
 
-  async isProductsExistByAttrib(category: Category, attribName: string): Promise<boolean> {
-    return await this.prodAttribRepository.count({ where: { category: category, attribName: attribName } }) > 0;
-  }
-
+  // Получаем продукты по категории с фильтрами по атрибутам
   async getProductsByCategory(
-    categoryId: number,
-    page: number = 1,
-    limit: number = 30,
-    sortBy: string = 'name',
-    filter: Attrib[] = []
-  ): Promise<Product[]> {
-    const query = this.productsRepository.createQueryBuilder('product')
-      .where('product.categoryId = :categoryId', { categoryId })
-      .skip((page - 1) * limit)
-      .take(limit);
+  categoryId: number,
+  page = 1,
+  limit = 30,
+  sortBy = 'name',
+  filter: { attributeId: number; valueId: number }[] = [],
+): Promise<any[]> {
 
-      filter.forEach(attrib => {
-        query.andWhere('product.id IN (SELECT prodId FROM product_attrib WHERE attribName = :filterName AND attribValue = :filterValue)', { filterName: attrib.attribName, filterValue: attrib.attribValue });
-      });
-
-    if (sortBy) {
-      query.orderBy(`product.${sortBy}`, 'ASC');
-    }
-
-    return await query.getMany();
+  // 🔐 whitelist сортировки
+  const allowedSort = ['name', 'price', 'createdAt'];
+  if (!allowedSort.includes(sortBy)) {
+    sortBy = 'name';
   }
+
+  /**
+   * ============================
+   * 1. Рекурсивные категории
+   * ============================
+   */
+  const categorySubQuery = `
+    WITH RECURSIVE category_tree AS (
+      SELECT id
+      FROM category
+      WHERE id = :categoryId
+      UNION ALL
+      SELECT c.id
+      FROM category c
+      INNER JOIN category_tree ct ON c.parentCategoryId = ct.id
+    )
+    SELECT id FROM category_tree
+  `;
+
+  /**
+   * ============================
+   * 2. Attributes JSON
+   * ============================
+   */
+  const attributesSubQuery = `
+    SELECT JSON_ARRAYAGG(
+      JSON_OBJECT(
+        'attributeName', att.name,
+        'attributeValue', av.value
+      )
+    )
+    FROM product_attribute_value pav_tmp
+    JOIN attribute_value av ON av.id = pav_tmp.valueId
+    JOIN attribute att ON att.id = av.attributeId
+    WHERE pav_tmp.variantId = v.id
+  `;
+
+  /**
+   * ============================
+   * 3. Sizes JSON
+   * ============================
+   */
+  const sizesSubQuery = `
+    SELECT JSON_ARRAYAGG(
+      JSON_OBJECT(
+        'size', ps.size,
+        'stock', ps.stock
+      )
+    )
+    FROM product_size ps
+    WHERE ps.productVariantId = v.id
+  `;
+
+  /**
+   * ============================
+   * 4. Основной QueryBuilder
+   * ============================
+   */
+  const qb = this.productsRepository
+    .createQueryBuilder('p')
+    .leftJoin('product_variant', 'v', 'v.productId = p.id')
+    .leftJoin('product_image', 'pi', 'pi.variantId = v.id')
+
+    .select([
+      'p.id AS product_id',
+      'p.name AS product_name',
+      'p.description AS product_description',
+      'p.categoryId AS product_categoryId',
+
+      'v.id AS variant_id',
+      'v.sku AS variant_sku',
+      'v.price AS variant_price',
+
+      `GROUP_CONCAT(DISTINCT pi.url SEPARATOR ' ') AS variant_images`,
+    ])
+
+    .addSelect(`(${attributesSubQuery})`, 'attributes')
+    .addSelect(`(${sizesSubQuery})`, 'sizes')
+
+    // 🔹 рекурсивные категории
+    .where(`p.categoryId IN (${categorySubQuery})`)
+    .setParameter('categoryId', categoryId)
+
+    .groupBy('p.id, v.id')
+    .orderBy(`p.${sortBy}`, 'ASC')
+    .limit(limit)
+    .offset((page - 1) * limit);
+
+  /**
+   * ============================
+   * 5. Фильтры по атрибутам
+   * ============================
+   */
+  if (filter.length > 0) {
+    const grouped = filter.reduce((acc, f) => {
+      if (!acc[f.attributeId]) acc[f.attributeId] = [];
+      acc[f.attributeId].push(f.valueId);
+      return acc;
+    }, {} as Record<number, number[]>);
+
+    let index = 0;
+    for (const values of Object.values(grouped)) {
+      qb.andWhere(
+        `
+        EXISTS (
+          SELECT 1
+          FROM product_attribute_value pav_f
+          WHERE pav_f.variantId = v.id
+            AND pav_f.valueId IN (:...values_${index})
+        )
+        `,
+        { [`values_${index}`]: values },
+      );
+      index++;
+    }
+  }
+
+  /**
+   * ============================
+   * 6. Выполнение
+   * ============================
+   */
+  return qb.getRawMany();
+}
 }

@@ -1,16 +1,15 @@
-import { Entity, Column, PrimaryGeneratedColumn, ManyToMany, JoinTable, ManyToOne } from 'typeorm';
-import { Product } from './product.entity';
-import { DeliveryPoint } from './delpoint.entity';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany } from 'typeorm';
 import { User } from './user.entity';
-import { IsString, IsNotEmpty, IsEnum } from 'class-validator';
-import { UserAddress } from './address.entity';
+import { UserAddress } from './userAddress.entity';
+import { DeliveryPoint } from './delpoint.entity';
+import { OrderItem } from './orderItem.entity';
 
 export enum OrderStatus {
-  PROCESSING = 'processing', // Обработка
-  IN_DELIVERY = 'in_delivery', // В доставке
-  DELIVERED_TO_PICKUP = 'delivered_to_pickup', // Доставлено в пункт выдачи
-  RECEIVED = 'received', // Получено
-  CANCELLED = 'cancelled', // Отменено
+  PROCESSING = 'processing',
+  IN_DELIVERY = 'in_delivery',
+  DELIVERED_TO_PICKUP = 'delivered_to_pickup',
+  RECEIVED = 'received',
+  CANCELLED = 'cancelled',
 }
 
 @Entity()
@@ -18,32 +17,21 @@ export class Order {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @ManyToOne(() => DeliveryPoint, (deliveryPoint) => deliveryPoint.orders)
-  deliveryPoint?: DeliveryPoint;
+  @ManyToOne(() => User, user => user.orders)
+  user: User;
 
-  @ManyToOne(() => UserAddress, (addr) => addr.orders)
+  @ManyToOne(() => UserAddress, { nullable: true })
   userAddress?: UserAddress;
 
-  @ManyToMany(() => Product, (product) => product.orders)
-  @JoinTable()
-  products: Product[];
+  @ManyToOne(() => DeliveryPoint, { nullable: true })
+  deliveryPoint?: DeliveryPoint;
 
-  @Column({
-    type: 'enum',
-    enum: OrderStatus,
-    default: OrderStatus.PROCESSING,
-  })
-  @IsEnum(OrderStatus)
+  @OneToMany(() => OrderItem, item => item.order)
+  items: OrderItem[];
+
+  @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.PROCESSING })
   status: OrderStatus;
-
-  @ManyToOne(() => User, user => user.orders) // Связь с пользователем
-  user: User; // Пользователь, который сделал заказ
 
   @Column({ type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' })
   orderDate: Date;
-
-  // Метод для проверки, может ли заказ иметь статус "Доставлено в пункт выдачи"
-  canBeDeliveredToPickup(): boolean {
-    return this.deliveryPoint !== undefined;
-  }
 }

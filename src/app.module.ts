@@ -10,10 +10,17 @@ import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { Category } from './entities/category.entity';
 import { OrdersModule } from './orders/orders.module';
-import { UserAddress } from './entities/address.entity';
-import { CategoryAttrib } from './entities/catattrib.entity';
-import { ProductAttrib } from './entities/prodattrib.entity';
-import { ProductAttribSubscriber } from './products/prodattrib.subscriber';
+import { UserAddress } from './entities/userAddress.entity';
+import { ProductAttributeValueSubscriber } from './products/prodattrib.subscriber';
+import { Attribute } from './entities/attribute.entity';
+import { AttributeValue } from './entities/attributeValue.entity';
+import { CategoryAttribute } from './entities/categoryAttribute.entity';
+import { OrderItem } from './entities/orderItem.entity';
+import { ProductAttributeValue } from './entities/productAttributeValue.entity';
+import { ProductImage } from './entities/productImage.entity';
+import { ProductVariant } from './entities/productVariant.entity';
+import { ProductSize } from './entities/productSize.entity';
+import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [
@@ -24,10 +31,10 @@ import { ProductAttribSubscriber } from './products/prodattrib.subscriber';
       database: '',
       password: '',
       username: '',
-      entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, CategoryAttrib, ProductAttrib],
+      entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, Attribute, ProductSize, AttributeValue, CategoryAttribute, OrderItem, ProductAttributeValue, ProductImage, ProductVariant],
       synchronize: true,
       autoLoadEntities: true,
-      subscribers: [ProductAttribSubscriber]
+      subscribers: [ProductAttributeValueSubscriber]
     }),
     UserModule,
     AuthModule,
@@ -37,4 +44,4 @@ import { ProductAttribSubscriber } from './products/prodattrib.subscriber';
     ProductsModule
   ],
 })
-export class AppModule {}
+export class AppModule { }

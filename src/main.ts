@@ -8,9 +8,10 @@ async function bootstrap() {
     origin: [
       'http://localhost',
       'http://localhost:3000',
-      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://95.81.114.17:81'
     ],
-    methods: ["GET", "POST"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     credentials: true,
   });
   app.setGlobalPrefix('api');

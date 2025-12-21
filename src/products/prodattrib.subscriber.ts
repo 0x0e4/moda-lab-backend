@@ -1,46 +1,81 @@
-import { CategoryAttrib } from 'src/entities/catattrib.entity';
-import { ProductAttrib } from 'src/entities/prodattrib.entity';
-import { Product } from 'src/entities/product.entity';
 import {
   EventSubscriber,
   EntitySubscriberInterface,
   InsertEvent,
-  DataSource,
   RemoveEvent,
+  DataSource,
 } from 'typeorm';
+import { ProductAttributeValue } from 'src/entities/productAttributeValue.entity';
+import { ProductVariant } from 'src/entities/productVariant.entity';
+import { CategoryAttribute } from 'src/entities/categoryAttribute.entity';
 
 @EventSubscriber()
-export class ProductAttribSubscriber implements EntitySubscriberInterface<ProductAttrib> {
-
+export class ProductAttributeValueSubscriber
+  implements EntitySubscriberInterface<ProductAttributeValue>
+{
   listenTo() {
-    return ProductAttrib;
+    return ProductAttributeValue;
   }
 
-  async beforeInsert(event: InsertEvent<ProductAttrib>) {
-    const entity = event.entity;
-    const prod = await event.manager.getRepository(Product).findOne({ where: { id: event.entity.prodId }, relations: { category: true }});
-    if(prod == null) return;
+  async beforeInsert(event: InsertEvent<ProductAttributeValue>) {
+    const pav = event.entity;
 
-    entity.category = prod.category;
-    const catAttribRep = event.manager.getRepository(CategoryAttrib);
+    if (!pav.variant || !pav.value) return;
 
-    if((await catAttribRep.findBy({ category: entity.category, attribName: entity.attribName })).length == 0)
-    {
-      const catAttrib = catAttribRep.create({ category: entity.category, attribName: entity.attribName });
-      await catAttribRep.save(catAttrib);
+    // Загружаем категорию через variant -> product
+    const variant = await event.manager.getRepository(ProductVariant).findOne({
+      where: { id: pav.variant.id },
+      relations: { product: { category: true } },
+    });
+
+    if (!variant?.product?.category) return;
+    const category = variant.product.category;
+
+    // Проверяем, существует ли CategoryAttribute
+    const catAttrRepo = event.manager.getRepository(CategoryAttribute);
+    const existing = await catAttrRepo.findOne({
+      where: { category: { id: category.id }, attribute: { id: pav.value.attribute.id } },
+    });
+
+    if (!existing) {
+      const catAttr = catAttrRepo.create({
+        category: category,
+        attribute: pav.value.attribute,
+      });
+      await catAttrRepo.save(catAttr);
     }
   }
 
-  async afterRemove(event: RemoveEvent<ProductAttrib>) {
-    const entity = event.databaseEntity;
-    const catAttribRep = event.manager.getRepository(CategoryAttrib);
-    const prodAttribRep = event.manager.getRepository(ProductAttrib);
+  async afterRemove(event: RemoveEvent<ProductAttributeValue>) {
+    const pav = event.databaseEntity;
+    if (!pav.variant || !pav.value) return;
 
-    if(await prodAttribRep.count({ where: { category: entity.category, attribName: entity.attribName } }) == 0)
-    {
-      const catAttrib = await catAttribRep.findOneBy({ category: entity.category, attribName: entity.attribName });
-      if(catAttrib !== null)
-        catAttribRep.remove(catAttrib);
+    const variant = await event.manager.getRepository(ProductVariant).findOne({
+      where: { id: pav.variant.id },
+      relations: { product: { category: true } },
+    });
+
+    if (!variant?.product?.category) return;
+    const category = variant.product.category;
+
+    const pavCount = await event.manager
+      .getRepository(ProductAttributeValue)
+      .count({
+        where: {
+          value: { attribute: { id: pav.value.attribute.id } },
+          variant: { product: { category: { id: category.id } } },
+        },
+        relations: { variant: { product: { category: true } }, value: { attribute: true } },
+      });
+
+    if (pavCount === 0) {
+      const catAttrRepo = event.manager.getRepository(CategoryAttribute);
+      const catAttr = await catAttrRepo.findOne({
+        where: { category: { id: category.id }, attribute: { id: pav.value.attribute.id } },
+      });
+      if (catAttr) {
+        await catAttrRepo.remove(catAttr);
+      }
     }
   }
 }

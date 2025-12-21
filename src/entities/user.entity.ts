@@ -1,6 +1,6 @@
 import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToMany, JoinTable } from 'typeorm';
 import { Order } from './order.entity'; // Импортируем сущность Order
-import { UserAddress } from './address.entity'; // Импортируем сущность Order
+import { UserAddress } from './userAddress.entity'; // Импортируем сущность Order
 import { Product } from './product.entity'; // Импортируем сущность Product
 
 export enum UserRole {
@@ -51,7 +51,7 @@ export class User {
   @OneToMany(() => UserAddress, addr => addr.user)
   addresses: UserAddress[];
 
-  @ManyToMany(() => Product, product => product.users)
+  @ManyToMany(() => Product)
   @JoinTable()
   wishlist: Product[]; // Список желаемых продуктов
 }
