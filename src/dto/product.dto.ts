@@ -48,7 +48,7 @@ export class ParseJsonPipe implements PipeTransform {
     try {
       return JSON.parse(value);
     } catch {
-      throw new BadRequestException('Invalid JSON');
+      return [];
     }
   }
 }

@@ -6,7 +6,7 @@ import { Roles } from 'src/auth/roles.decorator';
 import { UserRole } from 'src/entities/user.entity';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreateCategoryDto } from 'src/dto/category.dto';
-import { CacheInterceptor } from '@nestjs/cache-manager';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @Controller('categories')
 @UseInterceptors(CacheInterceptor)
@@ -32,6 +32,7 @@ export class CategoriesController {
     return this.categoriesService.getCategoryAttribs(id);
   }
 
+  @CacheTTL(60000)
   @Get()
   async getCategories(@Query('gender') gender: Gender): Promise<Category[]> {
     return this.categoriesService.getCategories(gender);

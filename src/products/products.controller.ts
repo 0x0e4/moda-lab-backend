@@ -8,7 +8,7 @@ import { UserRole } from 'src/entities/user.entity';
 import { CreateProductDto, ParseJsonPipe } from 'src/dto/product.dto';
 import { Gender } from 'src/entities/category.entity';
 import { Attribute } from 'src/entities/attribute.entity';
-import { CacheInterceptor } from '@nestjs/cache-manager';
+import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
 
 @UseInterceptors(CacheInterceptor)
 @Controller('products')
@@ -35,6 +35,7 @@ export class ProductsController {
     return this.productsService.getProductInfo(variantId);
   }
 
+  @CacheTTL(60000)
   @Get('category/:categoryId')
   async getProductsByCategory(
     @Param('categoryId') categoryId: number,

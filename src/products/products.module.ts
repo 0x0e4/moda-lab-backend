@@ -14,9 +14,10 @@ import { CacheModule } from '@nestjs/cache-manager';
 
 @Module({
   imports: [CacheModule.register({
-        ttl: 10000, // секунды
+        ttl: 10000, // миллисекунды
         max: 100, // максимальное количество записей
-      }),TypeOrmModule.forFeature([Product, Category, ProductVariant, ProductSize, ProductImage, ProductAttributeValue, Attribute, AttributeValue])],
+      }),
+      TypeOrmModule.forFeature([Product, Category, ProductVariant, ProductSize, ProductImage, ProductAttributeValue, Attribute, AttributeValue])],
   controllers: [ProductsController],
   providers: [ProductsService],
   exports: [ProductsService],

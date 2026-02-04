@@ -15,6 +15,29 @@ interface Dictionary<T> {
   [key: string]: T
 }
 
+export interface SearchProduct {
+  product_id: number;
+  product_name: string;
+  product_categoryId: number;
+  variant_id: number;
+  variant_sku: string;
+  variant_price: string;
+  variant_images: string[];
+}
+
+export interface AppliedFilter {
+  attributeId: number;  
+  valueId: number;     
+}
+
+export interface SearchResponse {
+  query: string;                      // исходный запрос пользователя
+  products: SearchProduct[];          // найденные товары
+  total: number;                      // общее количество найденных товаров
+  categoryId: number;                 // ID категории, в которой искал бэкенд
+  appliedFilters?: AppliedFilter[];   // фильтры, которые применил бэкенд
+}
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -99,7 +122,6 @@ export class ProductsService {
 
     if (!variant) return null;
 
-    // Затем загружаем продукт с **всеми вариантами** и их связями
     const product = await this.productsRepository.findOne({
       where: { id: variant.product.id },
       relations: {
@@ -121,8 +143,7 @@ export class ProductsService {
 
     const sizes = variant.sizes;
     const sizeIndex = sizes.findIndex((value) => value.size == size);
-    if(sizeIndex == -1)
-    {
+    if (sizeIndex == -1) {
       const productSize = this.productSizeRepository.create({ productVariant: variant, size: size, stock: count });
       await this.productSizeRepository.save(productSize);
     } else {
@@ -138,6 +159,10 @@ export class ProductsService {
     const pav = await this.productAttributeValuesRepository.findOneBy({ id: pavId });
     if (!pav) throw new NotFoundException(`Product attribute value not found`);
     await this.productAttributeValuesRepository.remove(pav);
+  }
+
+  async search(searchString: string): Promise<any> {
+    // TODO
   }
 
   /*async getRandomProducts(limit: number, page: number, seed: number): Promise<{ products: Product[], hasMore: boolean }> {
@@ -170,24 +195,24 @@ export class ProductsService {
 
   // Получаем продукты по категории с фильтрами по атрибутам
   async getProductsByCategory(
-  categoryId: number,
-  page = 1,
-  limit = 30,
-  sortBy = 'name',
-  filter: { attributeId: number; valueId: number }[] = [],
-): Promise<any[]> {
+    categoryId: number,
+    page = 1,
+    limit = 30,
+    sortBy = 'createdAt',
+    filter: { attributeId: number; valueId: number }[] = [],
+  ): Promise<any[]> {
 
-  const allowedSort = ['name', 'price', 'createdAt'];
-  if (!allowedSort.includes(sortBy)) {
-    sortBy = 'name';
-  }
+    const allowedSort = ['name', 'price', 'createdAt'];
+    if (!allowedSort.includes(sortBy)) {
+      sortBy = 'name';
+    }
 
-  /**
-   * ============================
-   * 1. Рекурсивные категории
-   * ============================
-   */
-  const categorySubQuery = `
+    /**
+     * ============================
+     * 1. Рекурсивные категории
+     * ============================
+     */
+    const categorySubQuery = `
     WITH RECURSIVE category_tree AS (
       SELECT id
       FROM category
@@ -200,7 +225,7 @@ export class ProductsService {
     SELECT id FROM category_tree
   `;
 
-  const imagesSubQuery = `
+    const imagesSubQuery = `
     SELECT JSON_ARRAYAGG(
       pi.url
     )
@@ -208,52 +233,52 @@ export class ProductsService {
     WHERE pi.variantId = v.id
   `;
 
-  /**
-   * ============================
-   * 2. Основной QueryBuilder
-   * ============================
-   */
-  const qb = this.productsRepository
-    .createQueryBuilder('p')
-    .leftJoin('product_variant', 'v', 'v.productId = p.id')
-    .leftJoin('product_image', 'pi', 'pi.variantId = v.id')
+    /**
+     * ============================
+     * 2. Основной QueryBuilder
+     * ============================
+     */
+    const qb = this.productsRepository
+      .createQueryBuilder('p')
+      .leftJoin('product_variant', 'v', 'v.productId = p.id')
+      .leftJoin('product_image', 'pi', 'pi.variantId = v.id')
 
-    .select([
-      'p.id AS product_id',
-      'p.name AS product_name',
-      'p.categoryId AS product_categoryId',
+      .select([
+        'p.id AS product_id',
+        'p.name AS product_name',
+        'p.categoryId AS product_categoryId',
 
-      'v.id AS variant_id',
-      'v.sku AS variant_sku',
-      'v.price AS variant_price',
-    ])
+        'v.id AS variant_id',
+        'v.sku AS variant_sku',
+        'v.price AS variant_price',
+      ])
 
-    .addSelect(`(${imagesSubQuery})`, 'variant_images')
+      .addSelect(`(${imagesSubQuery})`, 'variant_images')
 
-    .where(`p.categoryId IN (${categorySubQuery})`)
-    .setParameter('categoryId', categoryId)
+      .where(`p.categoryId IN (${categorySubQuery})`)
+      .setParameter('categoryId', categoryId)
 
-    .groupBy('p.id, v.id')
-    .orderBy(`p.${sortBy}`, 'ASC')
-    .limit(limit)
-    .offset((page - 1) * limit);
+      .groupBy('p.id, v.id')
+      .orderBy(`p.${sortBy}`, 'ASC')
+      .limit(limit)
+      .offset((page - 1) * limit);
 
-  /**
-   * ============================
-   * 3. Фильтры по атрибутам
-   * ============================
-   */
-  if (filter.length > 0) {
-    const grouped = filter.reduce((acc, f) => {
-      if (!acc[f.attributeId]) acc[f.attributeId] = [];
-      acc[f.attributeId].push(f.valueId);
-      return acc;
-    }, {} as Record<number, number[]>);
+    /**
+     * ============================
+     * 3. Фильтры по атрибутам
+     * ============================
+     */
+    if (filter.length > 0) {
+      const grouped = filter.reduce((acc, f) => {
+        if (!acc[f.attributeId]) acc[f.attributeId] = [];
+        acc[f.attributeId].push(f.valueId);
+        return acc;
+      }, {} as Record<number, number[]>);
 
-    let index = 0;
-    for (const values of Object.values(grouped)) {
-      qb.andWhere(
-        `
+      let index = 0;
+      for (const values of Object.values(grouped)) {
+        qb.andWhere(
+          `
         EXISTS (
           SELECT 1
           FROM product_attribute_value pav_f
@@ -261,12 +286,12 @@ export class ProductsService {
             AND pav_f.valueId IN (:...values_${index})
         )
         `,
-        { [`values_${index}`]: values },
-      );
-      index++;
+          { [`values_${index}`]: values },
+        );
+        index++;
+      }
     }
-  }
 
-  return qb.getRawMany();
-}
+    return qb.getRawMany();
+  }
 }

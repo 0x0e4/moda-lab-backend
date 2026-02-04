@@ -34,7 +34,22 @@ import { CacheModule } from '@nestjs/cache-manager';
       entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, Attribute, ProductSize, AttributeValue, CategoryAttribute, OrderItem, ProductAttributeValue, ProductImage, ProductVariant],
       synchronize: true,
       autoLoadEntities: true,
-      subscribers: [ProductAttributeValueSubscriber]
+      subscribers: [ProductAttributeValueSubscriber],
+      extra: {
+        typeCast: function (field, next) {
+          // Если тип поля — JSON
+          if (field.type === 'JSON') {
+            const value = field.string();
+            try {
+              return JSON.parse(value);
+            } catch {
+              return value;
+            }
+          }
+
+          return next();
+        }
+      }
     }),
     UserModule,
     AuthModule,

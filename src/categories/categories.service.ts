@@ -6,6 +6,11 @@ import { Attribute } from 'src/entities/attribute.entity';
 import { CategoryAttribute } from 'src/entities/categoryAttribute.entity';
 import { ProductAttributeValue } from 'src/entities/productAttributeValue.entity';
 
+interface AttributeValue {
+  id: number;
+  value: string;
+}
+
 interface CategoryTree extends Category {
   subcategories: CategoryTree[];
 }
@@ -77,18 +82,20 @@ export class CategoriesService {
       .select([
         'a.id AS attributeId',
         'a.name AS attributeName',
+        'av.id AS valueId',
         'av.value AS value',
         'p.categoryId AS categoryId',
       ])
+      .groupBy("av.id")
       .getRawMany();
 
     // 4. Группируем значения по атрибуту
-    const valuesMap: Record<number, Set<string>> = {};
+    const valuesMap: Record<number, Set<AttributeValue>> = {};
     const namesMap: Record<number, string> = {};
     for (const row of productAttribValues) {
       const attrId = Number.parseInt(row.attributeId);
       if (!valuesMap[attrId]) valuesMap[attrId] = new Set();
-      valuesMap[attrId].add(row.value);
+      valuesMap[attrId].add({ id: row.valueId, value: row.value });
       namesMap[attrId] = row.attributeName;
     }
 
