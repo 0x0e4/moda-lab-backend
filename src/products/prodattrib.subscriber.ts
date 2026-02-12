@@ -34,7 +34,7 @@ export class ProductAttributeValueSubscriber
     // Проверяем, существует ли CategoryAttribute
     const catAttrRepo = event.manager.getRepository(CategoryAttribute);
     const existing = await catAttrRepo.findOne({
-      where: { category: { id: category.id }, attribute: { id: pav.value.attribute.id } },
+      where: { category: { id: category.id }, attribute: { id: pav.value.attribute?.id } },
     });
 
     if (!existing) {
@@ -62,7 +62,7 @@ export class ProductAttributeValueSubscriber
       .getRepository(ProductAttributeValue)
       .count({
         where: {
-          value: { attribute: { id: pav.value.attribute.id } },
+          value: { attribute: { id: pav.value.attribute?.id } },
           variant: { product: { category: { id: category.id } } },
         },
         relations: { variant: { product: { category: true } }, value: { attribute: true } },
@@ -71,7 +71,7 @@ export class ProductAttributeValueSubscriber
     if (pavCount === 0) {
       const catAttrRepo = event.manager.getRepository(CategoryAttribute);
       const catAttr = await catAttrRepo.findOne({
-        where: { category: { id: category.id }, attribute: { id: pav.value.attribute.id } },
+        where: { category: { id: category.id }, attribute: { id: pav.value.attribute?.id } },
       });
       if (catAttr) {
         await catAttrRepo.remove(catAttr);

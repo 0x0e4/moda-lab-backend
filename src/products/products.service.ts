@@ -10,6 +10,7 @@ import { ProductImage } from 'src/entities/productImage.entity';
 import { CreateProductDto } from 'src/dto/product.dto';
 import { Attribute } from 'src/entities/attribute.entity';
 import { ProductSize } from 'src/entities/productSize.entity';
+import { ProductSizeItem } from 'src/entities/productSizeItem.entity';
 
 interface Dictionary<T> {
   [key: string]: T
@@ -26,8 +27,8 @@ export interface SearchProduct {
 }
 
 export interface AppliedFilter {
-  attributeId: number;  
-  valueId: number;     
+  attributeId: number;
+  valueId: number;
 }
 
 export interface SearchResponse {
@@ -57,6 +58,8 @@ export class ProductsService {
     public attributeRepository: Repository<Attribute>,
     @InjectRepository(ProductSize)
     public productSizeRepository: Repository<ProductSize>,
+    @InjectRepository(ProductSizeItem)
+    public productSizeItemRepository: Repository<ProductSizeItem>,
   ) { }
 
   async createProduct(dto: CreateProductDto): Promise<Product> {
@@ -75,7 +78,7 @@ export class ProductsService {
         product: product,
         price: variantDto.price,
         sku: variantDto.sku,
-        sizes: variantDto.sizes
+        sizes: variantDto.sizes.map(value => ({ id: value.size }))
       });
       await this.productVariantsRepository.save(variant);
 
@@ -109,6 +112,9 @@ export class ProductsService {
 
   async getAttributes(): Promise<Attribute[]> {
     const attributes = await this.attributeRepository.find({ relations: { values: true } });
+    const sizes = await this.productSizeItemRepository.find();
+
+    attributes.push({ id: 1, name: 'Размер', values: sizes.map(value => ({ id: value.id, value: value.size })) })
 
     return attributes;
   }
@@ -137,14 +143,14 @@ export class ProductsService {
   }
 
   // Добавление товара на склад для конкретного варианта
-  async addProductVariantCount(variantId: number, size: string, count: number): Promise<ProductVariant> {
+  async addProductVariantCount(variantId: number, size: number, count: number): Promise<ProductVariant> {
     const variant = await this.productVariantsRepository.findOneBy({ id: variantId });
     if (!variant) throw new NotFoundException(`Variant with ID ${variantId} not found`);
 
     const sizes = variant.sizes;
-    const sizeIndex = sizes.findIndex((value) => value.size == size);
+    const sizeIndex = sizes.findIndex((value) => value.size.id == size);
     if (sizeIndex == -1) {
-      const productSize = this.productSizeRepository.create({ productVariant: variant, size: size, stock: count });
+      const productSize = this.productSizeRepository.create({ productVariant: variant, size: { id: size }, stock: count });
       await this.productSizeRepository.save(productSize);
     } else {
       const productSize = sizes[sizeIndex];
@@ -199,13 +205,15 @@ export class ProductsService {
     page = 1,
     limit = 30,
     sortBy = 'createdAt',
+    order: ('ASC' | 'DESC') = 'DESC',
     filter: { attributeId: number; valueId: number }[] = [],
-  ): Promise<any[]> {
+  ): Promise<object> {
 
     const allowedSort = ['name', 'price', 'createdAt'];
     if (!allowedSort.includes(sortBy)) {
       sortBy = 'name';
     }
+    sortBy = (sortBy == 'price' ? 'v.' : 'p.') + sortBy;
 
     /**
      * ============================
@@ -242,6 +250,7 @@ export class ProductsService {
       .createQueryBuilder('p')
       .leftJoin('product_variant', 'v', 'v.productId = p.id')
       .leftJoin('product_image', 'pi', 'pi.variantId = v.id')
+      .leftJoin('product_size', 'ps', 'ps.productVariantId = v.id')
 
       .select([
         'p.id AS product_id',
@@ -250,7 +259,7 @@ export class ProductsService {
 
         'v.id AS variant_id',
         'v.sku AS variant_sku',
-        'v.price AS variant_price',
+        'v.price AS variant_price'
       ])
 
       .addSelect(`(${imagesSubQuery})`, 'variant_images')
@@ -259,7 +268,7 @@ export class ProductsService {
       .setParameter('categoryId', categoryId)
 
       .groupBy('p.id, v.id')
-      .orderBy(`p.${sortBy}`, 'ASC')
+      .orderBy(`${sortBy}`, order)
       .limit(limit)
       .offset((page - 1) * limit);
 
@@ -269,7 +278,13 @@ export class ProductsService {
      * ============================
      */
     if (filter.length > 0) {
+      const sizes: number[] = [];
+
       const grouped = filter.reduce((acc, f) => {
+        if (f.attributeId == 1) {
+          sizes.push(f.valueId);
+          return acc;
+        }
         if (!acc[f.attributeId]) acc[f.attributeId] = [];
         acc[f.attributeId].push(f.valueId);
         return acc;
@@ -290,8 +305,31 @@ export class ProductsService {
         );
         index++;
       }
+
+      if (sizes.length > 0)
+        qb.andWhere(`ps.sizeId IN (:...sizes)`, { [`sizes`]: sizes })
     }
 
-    return qb.getRawMany();
+    const countQb = qb.clone();
+
+    const totalResult = await countQb
+      .select('COUNT(DISTINCT v.id)', 'cnt')
+      .orderBy()
+      .limit(undefined)
+      .offset(undefined)
+      .groupBy()
+      .getRawOne();
+
+    const total = Number(totalResult.cnt);
+
+    return {
+      items: await qb.getRawMany(),
+      meta: {
+        total: total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 }

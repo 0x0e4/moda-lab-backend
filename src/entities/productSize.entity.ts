@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, PrimaryColumn } from 'typeorm';
 import { ProductVariant } from './productVariant.entity';
+import { ProductSizeItem } from './productSizeItem.entity';
 
 @Entity()
 export class ProductSize {
@@ -9,8 +10,8 @@ export class ProductSize {
   @ManyToOne(() => ProductVariant, productVar => productVar.sizes, { onDelete: 'CASCADE' })
   productVariant: ProductVariant;
 
-  @Column({ type: 'varchar', length: 6 })
-  size: string;
+  @ManyToOne(() => ProductSizeItem, prodSide => prodSide.items)
+  size: ProductSizeItem;
 
   @Column()
   stock: number;

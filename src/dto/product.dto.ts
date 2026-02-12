@@ -8,7 +8,7 @@ export interface VariantAttribDto {
 
 export interface ProductSizeDto {
   productVariantId: number;
-  size: string;
+  size: number;
   stock: number;
 }
 

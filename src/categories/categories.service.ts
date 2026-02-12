@@ -77,6 +77,8 @@ export class CategoriesService {
       .leftJoin('av.attribute', 'a')
       .leftJoin('pav.variant', 'pv')
       .leftJoin('pv.product', 'p')
+      .leftJoin('pv.sizes', 'ps')
+      .leftJoin('ps.size', 'psi')
       .where('p.categoryId IN (:...categoryIds)', { categoryIds })
       .andWhere('a.id IN (:...attribIds)', { attribIds })
       .select([
@@ -85,6 +87,8 @@ export class CategoriesService {
         'av.id AS valueId',
         'av.value AS value',
         'p.categoryId AS categoryId',
+        'psi.id AS sizeId',
+        'psi.size AS size'
       ])
       .groupBy("av.id")
       .getRawMany();
@@ -92,11 +96,19 @@ export class CategoriesService {
     // 4. Группируем значения по атрибуту
     const valuesMap: Record<number, Set<AttributeValue>> = {};
     const namesMap: Record<number, string> = {};
+    namesMap[1] = 'Размер';
+    valuesMap[1] = new Set();
+    const sizes: number[] = [];
     for (const row of productAttribValues) {
       const attrId = Number.parseInt(row.attributeId);
       if (!valuesMap[attrId]) valuesMap[attrId] = new Set();
       valuesMap[attrId].add({ id: row.valueId, value: row.value });
       namesMap[attrId] = row.attributeName;
+      if(!sizes.includes(row.sizeId))
+      {
+        valuesMap[1].add({ id: row.sizeId, value: row.size })
+        sizes.push(row.sizeId)
+      }
     }
 
     // 5. Формируем итоговую структуру

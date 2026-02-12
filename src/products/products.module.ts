@@ -11,13 +11,14 @@ import { Attribute } from 'src/entities/attribute.entity';
 import { AttributeValue } from 'src/entities/attributeValue.entity';
 import { ProductSize } from 'src/entities/productSize.entity';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ProductSizeItem } from 'src/entities/productSizeItem.entity';
 
 @Module({
   imports: [CacheModule.register({
         ttl: 10000, // миллисекунды
         max: 100, // максимальное количество записей
       }),
-      TypeOrmModule.forFeature([Product, Category, ProductVariant, ProductSize, ProductImage, ProductAttributeValue, Attribute, AttributeValue])],
+      TypeOrmModule.forFeature([Product, Category, ProductVariant, ProductSize, ProductSizeItem, ProductImage, ProductAttributeValue, Attribute, AttributeValue])],
   controllers: [ProductsController],
   providers: [ProductsService],
   exports: [ProductsService],

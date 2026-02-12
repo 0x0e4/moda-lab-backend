@@ -14,5 +14,5 @@ export class Attribute {
   values: AttributeValue[];
 
   @OneToMany(() => CategoryAttribute, ca => ca.attribute)
-  categoryAttributes: CategoryAttribute[];
+  categoryAttributes?: CategoryAttribute[];
 }

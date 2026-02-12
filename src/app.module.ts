@@ -21,6 +21,7 @@ import { ProductImage } from './entities/productImage.entity';
 import { ProductVariant } from './entities/productVariant.entity';
 import { ProductSize } from './entities/productSize.entity';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ProductSizeItem } from './entities/productSizeItem.entity';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { CacheModule } from '@nestjs/cache-manager';
       database: '',
       password: '',
       username: '',
-      entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, Attribute, ProductSize, AttributeValue, CategoryAttribute, OrderItem, ProductAttributeValue, ProductImage, ProductVariant],
+      entities: [Product, Order, DeliveryPoint, User, Category, UserAddress, Attribute, ProductSize, ProductSizeItem, AttributeValue, CategoryAttribute, OrderItem, ProductAttributeValue, ProductImage, ProductVariant],
       synchronize: true,
       autoLoadEntities: true,
       subscribers: [ProductAttributeValueSubscriber],

@@ -10,5 +10,5 @@ export class AttributeValue {
   value: string; // Красный, S, M, Хлопок и т.д.
 
   @ManyToOne(() => Attribute, attribute => attribute.values, { onDelete: 'CASCADE' })
-  attribute: Attribute;
+  attribute?: Attribute;
 }

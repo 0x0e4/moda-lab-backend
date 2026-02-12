@@ -42,11 +42,14 @@ export class ProductsController {
     @Query('page') page: number = 1,
     @Query('limit') limit: number = 30,
     @Query('sortBy') sortBy: string = 'id',
+    @Query('order') order: string = 'ASC',
     @Query('filter', ParseJsonPipe) filter: { attributeId: number; valueId: number }[] = [],
-  ): Promise<Product[]> {
+  ): Promise<object> {
     if (limit > 50 || limit < 5) throw new BadRequestException('Limit must be in 5 to 50.');
     if (page < 1) throw new BadRequestException('Page must be greater than 0.');
+    order = order.toUpperCase();
+    if(order != 'ASC' && order != 'DESC') throw new BadRequestException('Invalid order of sort.');
 
-    return this.productsService.getProductsByCategory(categoryId, page, limit, sortBy, filter);
+    return this.productsService.getProductsByCategory(categoryId, page, limit, sortBy, order, filter);
   }
 }
