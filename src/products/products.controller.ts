@@ -30,9 +30,24 @@ export class ProductsController {
     return this.productsService.getAttributes();
   }
 
-  @Get(':variantId')
-  async getProductInfo(@Param('variantId') variantId: number): Promise<Product | null> {
-    return this.productsService.getProductInfo(variantId);
+  @CacheTTL(60000)
+  @Get('search')
+  async getProductsBySearchQuery(
+    @Query('categoryId') categoryId: number | undefined,
+    @Query('page') page: number = 1,
+    @Query('limit') limit: number = 30,
+    @Query('sortBy') sortBy: string = 'id',
+    @Query('order') order: string = 'ASC',
+    @Query('filter', ParseJsonPipe) filter: { attributeId: number; valueId: number }[] = [],
+    @Query('query') searchQuery: string
+  ): Promise<object> {
+    if (limit > 50 || limit < 5) throw new BadRequestException('Limit must be in 5 to 50.');
+    if (page < 1) throw new BadRequestException('Page must be greater than 0.');
+    if(!searchQuery || searchQuery.length == 0 || searchQuery.trim().length == 0) throw new BadRequestException('Type something in query.');
+    order = order.toUpperCase();
+    if(order != 'ASC' && order != 'DESC') throw new BadRequestException('Invalid order of sort.');
+
+    return this.productsService.search(categoryId, page, limit, sortBy, order, filter, searchQuery);
   }
 
   @CacheTTL(60000)
@@ -51,5 +66,10 @@ export class ProductsController {
     if(order != 'ASC' && order != 'DESC') throw new BadRequestException('Invalid order of sort.');
 
     return this.productsService.getProductsByCategory(categoryId, page, limit, sortBy, order, filter);
+  }
+
+  @Get(':variantId')
+  async getProductInfo(@Param('variantId') variantId: number): Promise<Product | null> {
+    return this.productsService.getProductInfo(variantId);
   }
 }

@@ -167,8 +167,167 @@ export class ProductsService {
     await this.productAttributeValuesRepository.remove(pav);
   }
 
-  async search(searchString: string): Promise<any> {
-    // TODO
+  static prepareBooleanSearch(search: string): string {
+    return search
+      .trim()
+      .split(/\s+/)
+      .map(word => `+${word}*`)
+      .join(' ');
+  }
+
+  async search(
+    categoryId: number | undefined,
+    page = 1,
+    limit = 30,
+    sortBy = 'createdAt',
+    order: ('ASC' | 'DESC') = 'DESC',
+    filter: { attributeId: number; valueId: number }[] = [],
+    searchQuery: string
+  ): Promise<object> {
+    const allowedSort = ['name', 'price', 'createdAt'];
+    if (!allowedSort.includes(sortBy)) {
+      sortBy = 'name';
+    }
+    sortBy = (sortBy == 'price' ? 'v.' : 'p.') + sortBy;
+
+    /**
+     * ============================
+     * 1. Рекурсивные категории
+     * ============================
+     */
+
+    const imagesSubQuery = `
+    SELECT JSON_ARRAYAGG(
+      pi.url
+    )
+    FROM product_image pi
+    WHERE pi.variantId = v.id
+  `;
+
+    const preparedSearch = ProductsService.prepareBooleanSearch(searchQuery);
+
+    /**
+     * ============================
+     * 2. Основной QueryBuilder
+     * ============================
+     */
+    const qb = this.productsRepository
+      .createQueryBuilder('p')
+      .leftJoin('product_variant', 'v', 'v.productId = p.id')
+      .leftJoin('product_image', 'pi', 'pi.variantId = v.id')
+      .leftJoin('product_size', 'ps', 'ps.productVariantId = v.id')
+
+      .select([
+        'p.id AS product_id',
+        'p.name AS product_name',
+        'p.categoryId AS product_categoryId',
+
+        'v.id AS variant_id',
+        'v.sku AS variant_sku',
+        'v.price AS variant_price'
+      ])
+
+      .addSelect(`(${imagesSubQuery})`, 'variant_images')
+      .setParameter('categoryId', categoryId)
+
+      .addSelect(
+        `MATCH(p.name, p.description) AGAINST (:search IN BOOLEAN MODE)`,
+        'search_score'
+      )
+
+      .andWhere(
+        `(
+      MATCH(p.name, p.description) AGAINST (:search IN BOOLEAN MODE)
+      OR v.sku LIKE :skuSearch
+    )`,
+        {
+          search: preparedSearch,
+          skuSearch: `%${searchQuery}%`
+        }
+      )
+
+      .addOrderBy('search_score', 'DESC')
+
+      .groupBy('p.id, v.id')
+      .orderBy(`${sortBy}`, order)
+      .limit(limit)
+      .offset((page - 1) * limit);
+
+    if (categoryId !== undefined) {
+      const categorySubQuery = `
+    WITH RECURSIVE category_tree AS (
+      SELECT id
+      FROM category
+      WHERE id = :categoryId
+      UNION ALL
+      SELECT c.id
+      FROM category c
+      INNER JOIN category_tree ct ON c.parentCategoryId = ct.id
+    )
+    SELECT id FROM category_tree
+  `;
+      qb.andWhere(`p.categoryId IN (${categorySubQuery})`);
+    }
+
+    /**
+     * ============================
+     * 3. Фильтры по атрибутам
+     * ============================
+     */
+    if (filter.length > 0) {
+      const sizes: number[] = [];
+
+      const grouped = filter.reduce((acc, f) => {
+        if (f.attributeId == 1) {
+          sizes.push(f.valueId);
+          return acc;
+        }
+        if (!acc[f.attributeId]) acc[f.attributeId] = [];
+        acc[f.attributeId].push(f.valueId);
+        return acc;
+      }, {} as Record<number, number[]>);
+
+      let index = 0;
+      for (const values of Object.values(grouped)) {
+        qb.andWhere(
+          `
+        EXISTS (
+          SELECT 1
+          FROM product_attribute_value pav_f
+          WHERE pav_f.variantId = v.id
+            AND pav_f.valueId IN (:...values_${index})
+        )
+        `,
+          { [`values_${index}`]: values },
+        );
+        index++;
+      }
+
+      if (sizes.length > 0)
+        qb.andWhere(`ps.sizeId IN (:...sizes)`, { [`sizes`]: sizes })
+    }
+
+    const countQb = qb.clone();
+
+    const totalResult = await countQb
+      .select('COUNT(DISTINCT v.id)', 'cnt')
+      .orderBy()
+      .limit(undefined)
+      .offset(undefined)
+      .groupBy()
+      .getRawOne();
+
+    const total = Number(totalResult.cnt);
+
+    return {
+      items: await qb.getRawMany(),
+      meta: {
+        total: total,
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   }
 
   /*async getRandomProducts(limit: number, page: number, seed: number): Promise<{ products: Product[], hasMore: boolean }> {

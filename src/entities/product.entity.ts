@@ -1,8 +1,9 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, OneToMany, ManyToOne, Index } from 'typeorm';
 import { Category } from './category.entity';
 import { ProductVariant } from './productVariant.entity';
 
 @Entity()
+@Index(['name', 'description'], { fulltext: true })
 export class Product {
   @PrimaryGeneratedColumn()
   id: number;
