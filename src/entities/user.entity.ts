@@ -2,6 +2,7 @@ import { Entity, Column, PrimaryGeneratedColumn, OneToMany, ManyToMany, JoinTabl
 import { Order } from './order.entity'; // Импортируем сущность Order
 import { UserAddress } from './userAddress.entity'; // Импортируем сущность Order
 import { Product } from './product.entity'; // Импортируем сущность Product
+import { ProductVariant } from './productVariant.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -51,7 +52,7 @@ export class User {
   @OneToMany(() => UserAddress, addr => addr.user)
   addresses: UserAddress[];
 
-  @ManyToMany(() => Product)
+  @ManyToMany(() => ProductVariant)
   @JoinTable()
-  wishlist: Product[]; // Список желаемых продуктов
+  wishlist: ProductVariant[]; // Список желаемых продуктов
 }

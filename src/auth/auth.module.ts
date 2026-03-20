@@ -9,18 +9,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../entities/user.entity';
 import { Product } from '../entities/product.entity';
 import { RolesGuard } from './roles.guard';
+import { RefreshTokenStrategy } from './refreshJwt.strategy';
+import { RefreshTokenGuard } from './resfreshJwt.guard';
+import { ConfigService } from '@nestjs/config';
+import { ProductVariant } from 'src/entities/productVariant.entity';
 
 @Module({
   imports: [
     JwtModule.register({
-      secret: '8h$iRGka#120GDtq',
-      signOptions: {
-        expiresIn: "7d",
-      },
+      secret: process.env.JWT_ACCESS_SECRET,
     }),
-    TypeOrmModule.forFeature([User, Product])
+    TypeOrmModule.forFeature([User, Product, ProductVariant])
   ],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, UserService, RolesGuard],
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, UserService, RolesGuard, RefreshTokenStrategy, RefreshTokenGuard, ConfigService],
   controllers: [AuthController],
   exports: [JwtAuthGuard, RolesGuard],
 })

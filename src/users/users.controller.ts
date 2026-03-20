@@ -10,6 +10,12 @@ import { UserRole } from 'src/entities/user.entity';
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
+  @Get('wishlist')
+  @UseGuards(JwtAuthGuard)
+  async getWishlist(@Request() req) {
+    return this.userService.getWishlist(req.user);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   async getUser (@Param('id') id: number, @Request() req) {
@@ -27,10 +33,8 @@ export class UserController {
 
   @Put(':id')
   @UseGuards(JwtAuthGuard)
+  @Roles(UserRole.ADMIN)
   async updateUser (@Param('id') id: number, @Body() updateUserDto: UpdateUserDto, @Request() req) {
-    if(req.user.id != id && req.user.role != 'admin')
-      throw new ForbiddenException(`You are not administrator`);
-
     return this.userService.updateUser (id, updateUserDto);
   }
 
@@ -43,13 +47,13 @@ export class UserController {
 
   @Post('wishlist/:productId')
   @UseGuards(JwtAuthGuard)
-  async addToWishlist(@Param('productId') productId: number, @Request() req) {
-    return this.userService.addToWishlist(req.user, productId);
+  async addToWishlist(@Param('productId') variantId: number, @Request() req) {
+    return this.userService.addToWishlist(req.user, variantId);
   }
 
   @Delete('wishlist/:productId')
   @UseGuards(JwtAuthGuard)
-  async removeFromWishlist(@Param('productId') productId: number, @Request() req) {
-    return this.userService.removeFromWishlist(req.user, productId);
+  async removeFromWishlist(@Param('productId') variantId: number, @Request() req) {
+    return this.userService.removeFromWishlist(req.user, variantId);
   }
 }

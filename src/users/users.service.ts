@@ -4,6 +4,13 @@ import { Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { Product } from '../entities/product.entity';
 import { CreateUserDto, UpdateUserDto } from '../dto/user.dto';
+import { ProductVariant } from 'src/entities/productVariant.entity';
+
+export interface FavoriteItem {
+  id: number;
+  variantId: number;
+  sizeId: number;
+}
 
 @Injectable()
 export class UserService {
@@ -12,6 +19,8 @@ export class UserService {
     private userRepository: Repository<User>,
     @InjectRepository(Product)
     private productRepository: Repository<Product>,
+    @InjectRepository(ProductVariant)
+    private productVariantRepository: Repository<ProductVariant>,
   ) {}
 
   async createUser (createUserDto: CreateUserDto): Promise<User> {
@@ -47,19 +56,27 @@ export class UserService {
     await this.userRepository.remove(user);
   }
 
-  async addToWishlist(user: User, productId: number): Promise<User> {
-    const product = await this.productRepository.findOne({ where: { id: productId } });
+  async getWishlist(user: User): Promise<number[]> {
+    const wishlist = (await this.userRepository.findOne({ where: { id: user.id }, relations: ['wishlist']}))?.wishlist
+
+    return wishlist?.map((value) => value.id) || []
+  }
+
+  async addToWishlist(user: User, variantId: number): Promise<User> {
+    const product = await this.productVariantRepository.findOne({ where: { id: variantId } });
+    user = await this.userRepository.findOne({ where: { id: user.id }, relations: ['wishlist']}) || user
 
     if (!product) {
-      throw new NotFoundException(`Product with ID ${productId} not found`);
+      throw new NotFoundException(`Product variant with ID ${variantId} not found`);
     }
 
-    user.wishlist.push(product);
+    if(user.wishlist.indexOf(product) == -1)
+      user.wishlist.push(product);
     return await this.userRepository.save(user);
   }
 
-  async removeFromWishlist(user: User, productId: number): Promise<User> {
-    user.wishlist = user.wishlist.filter(product => product.id !== productId);
+  async removeFromWishlist(user: User, variantId: number): Promise<User> {
+    user.wishlist = user.wishlist.filter(productVariant => productVariant.id !== variantId);
     return await this.userRepository.save(user);
   }
 }

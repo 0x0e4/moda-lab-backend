@@ -16,29 +16,6 @@ interface Dictionary<T> {
   [key: string]: T
 }
 
-export interface SearchProduct {
-  product_id: number;
-  product_name: string;
-  product_categoryId: number;
-  variant_id: number;
-  variant_sku: string;
-  variant_price: string;
-  variant_images: string[];
-}
-
-export interface AppliedFilter {
-  attributeId: number;
-  valueId: number;
-}
-
-export interface SearchResponse {
-  query: string;                      // исходный запрос пользователя
-  products: SearchProduct[];          // найденные товары
-  total: number;                      // общее количество найденных товаров
-  categoryId: number;                 // ID категории, в которой искал бэкенд
-  appliedFilters?: AppliedFilter[];   // фильтры, которые применил бэкенд
-}
-
 @Injectable()
 export class ProductsService {
   constructor(
@@ -230,11 +207,6 @@ export class ProductsService {
       .addSelect(`(${imagesSubQuery})`, 'variant_images')
       .setParameter('categoryId', categoryId)
 
-      .addSelect(
-        `MATCH(p.name, p.description) AGAINST (:search IN BOOLEAN MODE)`,
-        'search_score'
-      )
-
       .andWhere(
         `(
       MATCH(p.name, p.description) AGAINST (:search IN BOOLEAN MODE)
@@ -245,8 +217,6 @@ export class ProductsService {
           skuSearch: `%${searchQuery}%`
         }
       )
-
-      .addOrderBy('search_score', 'DESC')
 
       .groupBy('p.id, v.id')
       .orderBy(`${sortBy}`, order)
@@ -322,6 +292,8 @@ export class ProductsService {
     return {
       items: await qb.getRawMany(),
       meta: {
+        query: searchQuery,
+        categoryId: categoryId,
         total: total,
         page: Number(page),
         limit: Number(limit),
