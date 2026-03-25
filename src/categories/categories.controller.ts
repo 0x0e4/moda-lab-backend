@@ -7,7 +7,9 @@ import { UserRole } from 'src/entities/user.entity';
 import { JwtAuthGuard } from 'src/auth/jwt-auth.guard';
 import { CreateCategoryDto } from 'src/dto/category.dto';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiBearerAuth()
 @Controller('categories')
 @UseInterceptors(CacheInterceptor)
 export class CategoriesController {

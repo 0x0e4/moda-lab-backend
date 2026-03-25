@@ -9,7 +9,9 @@ import { CreateProductDto, ParseJsonPipe } from 'src/dto/product.dto';
 import { Gender } from 'src/entities/category.entity';
 import { Attribute } from 'src/entities/attribute.entity';
 import { CacheInterceptor, CacheTTL } from '@nestjs/cache-manager';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiBearerAuth()
 @UseInterceptors(CacheInterceptor)
 @Controller('products')
 export class ProductsController {
@@ -19,7 +21,6 @@ export class ProductsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.EMPLOYEE)
   async createProduct(@Body() createProductDto: CreateProductDto): Promise<Product> {
-    // предполагаем, что createProductDto.attributes теперь содержит {attributeId, valueId}[]
     return this.productsService.createProduct(
       createProductDto
     );
